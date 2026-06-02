@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Call Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .toggle-track  { transition: background 0.2s; }
+    .toggle-knob   { transition: transform 0.2s; }
+    .seg           { flex: 1; padding: 6px 0; font-size: 0.8rem; font-weight: 500; transition: background 0.15s, color 0.15s; }
+    .seg.on        { background: #2563eb; color: #fff; }
+    .seg.off       { background: #fff; color: #475569; }
+    .seg.off:hover { background: #f1f5f9; }
+    input[type=checkbox] { accent-color: #2563eb; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800">
+
+<div class="max-w-lg mx-auto py-8 px-4 space-y-4">
+
+  <!-- Header -->
+  <div class="flex items-center gap-3 mb-2">
+    <img src="/logo.png" class="h-10 w-10 rounded-lg object-cover" alt="" />
+    <div>
+      <h1 class="text-xl font-bold leading-tight">Call Generator</h1>
+      <p class="text-xs text-slate-400">AI call transcripts &amp; Knovvu push</p>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <button onclick="toggleSection('settings-body','settings-chev')"
+      class="w-full flex justify-between items-center px-5 py-3.5 text-left hover:bg-slate-50 transition-colors">
+      <span class="font-semibold text-sm text-slate-700">⚙ Settings</span>
+      <svg id="settings-chev" class="w-4 h-4 text-slate-400 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </button>
+    <div id="settings-body" class="hidden border-t border-slate-100 px-5 py-4 space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">OpenAI API Key</label>
+        <input id="s-apikey" type="password" placeholder="sk-..."
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Knovvu Identity URL</label>
+        <input id="s-identity" type="text" placeholder="https://your-tenant.identity.ca.demo.sestek.com"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Knovvu Base URL</label>
+        <input id="s-base" type="text" placeholder="https://your-tenant.web.ca.demo.sestek.com"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Source Name</label>
+        <input id="s-source" type="text" placeholder="Default Api Source"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">
+          Agent IDs <span class="text-slate-400 font-normal">(optional — one per line or comma-separated)</span>
+        </label>
+        <textarea id="s-agent-ids" rows="3" placeholder="45596184-52cd-76c7-5792-39fd263c73a6&#10;ab5c6bb0-a18a-52c9-a9ba-39fcde286cf4"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+        <p class="text-xs text-slate-400 mt-0.5">If set, calls are assigned randomly to these agents only. Leave blank to auto-select from API.</p>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Client ID</label>
+        <input id="s-client-id" type="text" placeholder="e.g. CA.Sestek.Customer"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-500 mb-1">Client Secret</label>
+        <input id="s-client-secret" type="password" placeholder="client secret"
+          class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <button onclick="saveSettings()"
+        class="w-full bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+        Save Settings
+      </button>
+      <p id="s-status" class="text-xs text-center text-slate-400 h-4"></p>
+    </div>
+  </div>
+
+  <!-- Generate -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 space-y-4">
+    <h2 class="font-semibold text-sm text-slate-700">Generate Conversations</h2>
+
+    <!-- Language -->
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1.5">Language</label>
+      <div class="flex rounded-lg overflow-hidden border border-slate-200">
+        <button id="lang-en" onclick="setLang('en')" class="seg on">🇺🇸 English</button>
+        <button id="lang-tr" onclick="setLang('tr')" class="seg off border-l border-slate-200">🇹🇷 Turkish</button>
+      </div>
+    </div>
+
+    <!-- Domain -->
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1.5">Domain</label>
+      <select id="domain" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="random">🎲  Random</option>
+        <option value="banking">🏦  Banking</option>
+        <option value="ecommerce">🛒  E-Commerce</option>
+        <option value="telco">📱  Telecom</option>
+        <option value="insurance">🛡️  Insurance</option>
+        <option value="healthcare">🏥  Healthcare</option>
+        <option value="utilities">⚡  Utilities</option>
+      </select>
+    </div>
+
+    <!-- Category -->
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1.5">Category</label>
+      <div class="grid grid-cols-2 gap-y-2 gap-x-4">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" value="complaint"   class="cat-cb w-4 h-4" checked /> 😤 Complaint
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" value="billing"     class="cat-cb w-4 h-4" /> 💳 Billing
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" value="technical"   class="cat-cb w-4 h-4" /> 🔧 Technical
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" value="churn"       class="cat-cb w-4 h-4" /> 🚪 Churn
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" value="track_order" class="cat-cb w-4 h-4" /> 📦 Track Order
+        </label>
+      </div>
+    </div>
+
+    <!-- Length -->
+    <div>
+      <label class="block text-xs font-medium text-slate-500 mb-1.5">
+        Conversation Length <span id="len-hint" class="text-slate-400 font-normal">(~12–16 turns)</span>
+      </label>
+      <div class="flex rounded-lg overflow-hidden border border-slate-200">
+        <button id="len-short"    onclick="setLen('short')"    class="seg off">Short</button>
+        <button id="len-moderate" onclick="setLen('moderate')" class="seg on  border-x border-slate-200">Moderate</button>
+        <button id="len-long"     onclick="setLen('long')"     class="seg off">Long</button>
+      </div>
+    </div>
+
+    <!-- Negative + Count row -->
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3 flex-1">
+        <button id="neg-track" onclick="toggleNeg()"
+          class="toggle-track relative w-10 h-6 rounded-full bg-slate-200 flex-shrink-0">
+          <span id="neg-knob" class="toggle-knob absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow"></span>
+        </button>
+        <div>
+          <p class="text-sm font-medium text-slate-700">Negative Sentiment</p>
+          <p class="text-xs text-slate-400">Frustrated, uncooperative customer</p>
+        </div>
+      </div>
+      <div class="flex-shrink-0 text-right">
+        <label class="block text-xs font-medium text-slate-500 mb-1">Count</label>
+        <input id="count" type="number" min="1" max="20" value="3"
+          class="w-16 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+    </div>
+
+    <!-- Generate button -->
+    <button id="gen-btn" onclick="generate()"
+      class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+      ⚡ Generate Conversations
+    </button>
+
+    <!-- Progress -->
+    <div id="progress" class="hidden space-y-1">
+      <div class="flex justify-between text-xs text-slate-500">
+        <span id="prog-label">Generating…</span>
+        <span id="prog-frac" class="tabular-nums font-mono"></span>
+      </div>
+      <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+        <div id="prog-bar" class="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conversations -->
+  <div id="conv-section" class="hidden space-y-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-sm text-slate-700">
+        Conversations <span id="conv-count" class="text-slate-400 font-normal"></span>
+      </h2>
+      <button onclick="pushAll()"
+        class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
+        ↑ Push All to Knovvu
+      </button>
+    </div>
+    <div id="conv-list" class="space-y-3"></div>
+  </div>
+
+</div>
+
+<script>
+  let conversations  = [];
+  let selectedLang   = 'en';
+  let selectedLen    = 'moderate';
+  let isNeg          = false;
+
+  const LEN_HINTS = { short: '~6–8 turns', moderate: '~12–16 turns', long: '~22–28 turns' };
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  (async () => {
+    try {
+      const s = await fetch('/api/settings').then(r => r.json());
+      if (s.identity_url) document.getElementById('s-identity').value   = s.identity_url;
+      if (s.base_url)     document.getElementById('s-base').value       = s.base_url;
+      if (s.client_id)    document.getElementById('s-client-id').value  = s.client_id;
+      if (s.source_name)  document.getElementById('s-source').value       = s.source_name;
+      if (s.agent_ids)    document.getElementById('s-agent-ids').value   = s.agent_ids;
+      if (!s.api_key_set) openSettings();
+    } catch(_) {}
+
+    try {
+      conversations = await fetch('/api/conversations').then(r => r.json());
+      renderConvs();
+    } catch(_) {}
+  })();
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  function openSettings() {
+    document.getElementById('settings-body').classList.remove('hidden');
+    document.getElementById('settings-chev').style.transform = 'rotate(180deg)';
+  }
+
+  function toggleSection(bodyId, chevId) {
+    const body = document.getElementById(bodyId);
+    const chev = document.getElementById(chevId);
+    const open = body.classList.toggle('hidden') === false;
+    chev.style.transform = open ? 'rotate(180deg)' : '';
+  }
+
+  async function saveSettings() {
+    const payload = {
+      api_key:       document.getElementById('s-apikey').value,
+      identity_url:  document.getElementById('s-identity').value,
+      base_url:      document.getElementById('s-base').value,
+      source_name:   document.getElementById('s-source').value,
+      agent_ids:     document.getElementById('s-agent-ids').value,
+      client_id:     document.getElementById('s-client-id').value,
+      client_secret: document.getElementById('s-client-secret').value,
+    };
+    const ok = (await fetch('/api/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })).ok;
+    const st = document.getElementById('s-status');
+    st.textContent = ok ? '✓ Saved' : '✗ Failed';
+    st.className   = `text-xs text-center h-4 ${ok ? 'text-green-600' : 'text-red-500'}`;
+    setTimeout(() => { st.textContent = ''; }, 2000);
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  function setLang(l) {
+    selectedLang = l;
+    document.getElementById('lang-en').className = `seg ${l==='en'?'on':'off'}`;
+    document.getElementById('lang-tr').className = `seg ${l==='tr'?'on':'off'} border-l border-slate-200`;
+  }
+
+  function setLen(l) {
+    selectedLen = l;
+    document.getElementById('len-short').className    = `seg ${l==='short'   ?'on':'off'}`;
+    document.getElementById('len-moderate').className = `seg ${l==='moderate'?'on':'off'} border-x border-slate-200`;
+    document.getElementById('len-long').className     = `seg ${l==='long'    ?'on':'off'}`;
+    document.getElementById('len-hint').textContent   = LEN_HINTS[l];
+  }
+
+  function toggleNeg() {
+    isNeg = !isNeg;
+    document.getElementById('neg-track').style.backgroundColor = isNeg ? '#ef4444' : '';
+    document.getElementById('neg-knob').style.transform        = isNeg ? 'translateX(1.5rem)' : '';
+  }
+
+  // ── Generate ──────────────────────────────────────────────────────────────
+  async function generate() {
+    const cats = [...document.querySelectorAll('.cat-cb:checked')].map(c => c.value);
+    if (!cats.length) { alert('Select at least one category.'); return; }
+
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = true; btn.textContent = 'Generating…';
+
+    const prog = document.getElementById('progress');
+    prog.classList.remove('hidden');
+    setProgress(0, 0, 'Connecting…');
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain:     document.getElementById('domain').value,
+          categories: cats,
+          count:      parseInt(document.getElementById('count').value) || 3,
+          language:   selectedLang,
+          length:     selectedLen,
+          negative:   isNeg,
+        }),
+      });
+      if (!res.ok) { throw new Error((await res.json().catch(()=>({error:res.statusText}))).error); }
+
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n'); buf = lines.pop();
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try { onSSE(JSON.parse(line.slice(6))); } catch(e) { console.error(e); }
+          }
+        }
+      }
+    } catch(err) {
+      setProgress(0, 0, '✗ ' + err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '⚡ Generate Conversations';
+      setTimeout(() => prog.classList.add('hidden'), 2500);
+    }
+  }
+
+  function onSSE(ev) {
+    const { type, current: cur, total: tot } = ev;
+    if      (type === 'connected')    setProgress(0,   tot, `Starting ${tot} conversation(s)…`);
+    else if (type === 'processing')   setProgress(cur-1, tot, `Generating ${cur} / ${tot}…`);
+    else if (type === 'conversation') {
+      setProgress(cur, tot, `Done ${cur} / ${tot}`);
+      if (!conversations.find(c => c.id === ev.data.id)) conversations.unshift(ev.data);
+      renderConvs();
+    }
+    else if (type === 'error') setProgress(cur, tot, `⚠ Error on ${cur}: ${ev.message}`);
+    else if (type === 'done')  setProgress(tot, tot, `✓ Complete — ${conversations.length} conversation(s)`);
+  }
+
+  function setProgress(cur, tot, label) {
+    document.getElementById('prog-label').textContent = label;
+    document.getElementById('prog-frac').textContent  = tot ? `${cur} / ${tot}` : '';
+    document.getElementById('prog-bar').style.width   = tot ? `${(cur/tot)*100}%` : '0%';
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderConvs() {
+    const section = document.getElementById('conv-section');
+    const list    = document.getElementById('conv-list');
+
+    if (!conversations.length) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    document.getElementById('conv-count').textContent = `(${conversations.length})`;
+
+    list.innerHTML = conversations.map(c => {
+      const cat   = (c.category||'').replace(/_/g,' ').replace(/\b\w/g,x=>x.toUpperCase());
+      const dom   = (c.domain||'').replace(/\b\w/g,x=>x.toUpperCase());
+      const pushedBadge = c.pushed
+        ? `<span class="text-xs text-emerald-600 font-medium">✓ Pushed${c.push_call_id ? ` #${c.push_call_id}` : ''}</span>`
+        : '';
+      const audioBtn = c.audio_generated
+        ? `<button onclick="playAudio('${c.id}')" class="btn-sm bg-slate-100 hover:bg-slate-200 text-slate-700">▶ Play</button>
+           <a href="/api/download/audio/${c.id}" class="btn-sm bg-slate-100 hover:bg-slate-200 text-slate-700">↓ MP3</a>`
+        : `<button onclick="synthesize('${c.id}')" id="syn-${c.id}" class="btn-sm bg-slate-100 hover:bg-slate-200 text-slate-700">♪ Synthesize</button>`;
+      return `
+        <div class="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
+          <div class="flex justify-between items-start">
+            <div class="flex flex-wrap gap-1">
+              <span class="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">${dom}</span>
+              <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">${cat}</span>
+              ${c.negative ? '<span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">😠 Negative</span>' : ''}
+            </div>
+            <button onclick="deleteConv('${c.id}')" class="text-slate-300 hover:text-red-400 transition-colors text-lg leading-none">&times;</button>
+          </div>
+          <p class="text-sm text-slate-500 italic leading-snug">${esc(c.summary||'')}</p>
+          <details class="text-xs text-slate-400">
+            <summary class="cursor-pointer hover:text-slate-600 select-none">
+              Transcript (${(c.turns||[]).length} turns)
+            </summary>
+            <div class="mt-2 space-y-2 max-h-64 overflow-y-auto">
+              ${(c.turns||[]).map(t => `
+                <div>
+                  <p class="font-semibold ${t.speaker==='agent'?'text-blue-600':'text-emerald-600'} uppercase text-xs">${t.speaker==='agent'?'Agent':'Customer'}</p>
+                  <p class="text-slate-700">${esc(t.text)}</p>
+                </div>`).join('')}
+            </div>
+          </details>
+          <div id="audio-${c.id}" class="hidden">
+            <audio controls src="/api/audio/${c.id}" class="w-full h-8"></audio>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            ${audioBtn}
+            <button onclick="pushOne('${c.id}')" id="push-${c.id}"
+              class="btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium">↑ Push</button>
+            ${pushedBadge}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Audio ─────────────────────────────────────────────────────────────────
+  async function synthesize(convId) {
+    const btn = document.getElementById(`syn-${convId}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Synthesizing…'; }
+    try {
+      const data = await fetch(`/api/synthesize/${convId}`, { method: 'POST' }).then(r => r.json());
+      if (data.success) {
+        const c = conversations.find(x => x.id === convId);
+        if (c) c.audio_generated = true;
+        renderConvs();
+      } else {
+        alert('Synthesis failed: ' + (data.error||'unknown'));
+        if (btn) { btn.disabled = false; btn.textContent = '♪ Synthesize'; }
+      }
+    } catch(err) {
+      alert(err.message);
+      if (btn) { btn.disabled = false; btn.textContent = '♪ Synthesize'; }
+    }
+  }
+
+  function playAudio(convId) {
+    const area = document.getElementById(`audio-${convId}`);
+    area.classList.remove('hidden');
+    area.querySelector('audio').play();
+  }
+
+  // ── Push ──────────────────────────────────────────────────────────────────
+  async function pushOne(convId) {
+    const btn = document.getElementById(`push-${convId}`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Pushing…'; }
+    try {
+      const data = await fetch(`/api/push/${convId}`, { method: 'POST' }).then(r => r.json());
+      if (data.success) {
+        const c = conversations.find(x => x.id === convId);
+        if (c) { c.pushed = true; c.push_call_id = data.call_id; c.audio_generated = true; }
+        renderConvs();
+      } else {
+        alert('Push failed: ' + (data.error||'unknown'));
+        if (btn) { btn.disabled = false; btn.textContent = '↑ Push'; }
+      }
+    } catch(err) {
+      alert(err.message);
+      if (btn) { btn.disabled = false; btn.textContent = '↑ Push'; }
+    }
+  }
+
+  async function pushAll() {
+    for (const c of conversations) {
+      if (!c.pushed) await pushOne(c.id);
+    }
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  async function deleteConv(id) {
+    await fetch(`/api/delete/${id}`, { method: 'DELETE' });
+    conversations = conversations.filter(c => c.id !== id);
+    renderConvs();
+  }
+
+  function esc(s) {
+    return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+
+<style>
+  .btn-sm { display:inline-flex; align-items:center; gap:4px;
+            padding:4px 10px; border-radius:6px; font-size:0.75rem; cursor:pointer; }
+</style>
+</body>
+</html>
